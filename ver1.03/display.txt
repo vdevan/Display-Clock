@@ -1,0 +1,8 @@
+Display Text Config. Total Lines:6
+1,#7dff46,"You can even scroll display with colorful messages  *** Current Temperature: %t ***"
+1,#00ff9b,"YOUR PAGE"
+0,#9696ff,"You can use this page"
+0,#ff00ff,"to display your Text"
+0,#00ffff,"Use browser-Point to:"
+0,#fa969a,"http://displayclock/"
+
