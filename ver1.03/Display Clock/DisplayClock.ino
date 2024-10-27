@@ -117,7 +117,7 @@ char CALCODE[] = "tampp";
 char CONFIG[] = "/config.txt";
 //Provides GatewayIP, location and Time zone. 
 String LocationUri = "http://ipinfo.io/?token=";
-String LocationKey = "81603eda566497";  //to be deleted before posting on public domain
+String LocationKey = "8160######";  //to be deleted before posting on public domain
 
 //Do not call WUri without setting Location & TimeZone. Call Getlocation first
 //Parameters needed are: // + Location  + TimeZone + "&current=temperature_2m,rain,cloud_cover&hourly=temperature_2m,rain,
