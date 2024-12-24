@@ -1,10 +1,14 @@
+#include "Globals.h"
 
 static void connectWifi()
 {
-    //Serial.println("Connecting as wifi client...");
+    WiFi.mode(WIFI_AP);
+    Serial.print("Scanning Networks...found Network: ");
     int n = WiFi.scanNetworks();
+    Serial.println(n);
     unsigned long tick = millis();
     storageIndex = -1;
+    Serial.printf("Stored Networks: %d\n",storedNetworks);
     int j;
     for (int i = 0; i < storedNetworks; i++)
     {
@@ -84,8 +88,15 @@ static void startServer()
   if (!bConnect)
   {
       //bServer = true;
+    bCaptive = true;
     if (bgTask != null)
       vTaskDelete(bgTask);
+   DisplayServerScreen();
+  }
+}
+
+static void DisplayServerScreen()
+{
     dma_display->setFont();
     dma_display->fillScreen(myBLACK);
     Serial.println("Cleared Screen");
@@ -118,8 +129,10 @@ static void startServer()
     dma_display->printf("http://%s/",HOSTNAME);
     Serial.printf("Web Server Started...SSID = %s; Password = %s\n",ESPSSID,WIFIPWD);
     Serial.printf("http://%s/\n",HOSTNAME);
-  }
+    return;
 }
+
+
 static String GETStreamRequest(String src)
 {
   Serial.printf("HTTPClient will use URL:\n%s\n", src.c_str());
@@ -290,4 +303,72 @@ String GetData(char* fName, int Lookup)
    
   return "";
     
+}
+
+
+/****************************************************************
+ * This procedure will first attempt to use our own AWS server 
+ * to set the Timezone. If it fails then use the internal plug-in
+ * of eztime server. Returns true if it succeeds. Else false
+ * Modified: 10th Nov 2024 
+ *****************************************************************/
+static bool SetTimeZone(Timezone *TZ, String location)
+{
+    if (TZ->setLocation(location))
+      return true;
+    Serial.println("Native plug-in failed. Using Brahas plug-in");
+    String PosixString = location;
+    JSONVar myObj;
+    PosixString.toLowerCase();
+    PosixString = "{\"filedata\":\"timezones/timezones.json\",\"key\":\"" + PosixString + "\"}";
+    Serial.printf("Sending to POST Server: %s\n",PosixString.c_str());
+    PosixString = SecurePOSTRequest(TZURL, PosixString);
+    Serial.printf("Secure POST returned: %s\n",PosixString.c_str());
+
+    if (PosixString != "" )
+    {
+      myObj=JSON.parse(PosixString);
+      //Serial.printf("TZURL Script succeeded. Setting POSIXString: %s\n",JSON.stringify(myObj["value"]).c_str());
+      return (TZ->setPosix(myObj["value"]));
+    }
+    return false;
+}
+
+
+/****************************************************************
+ * This will securely POST to AWS server. This method has been tested to work.
+ * https://t7lcs31js3.execute-api.us-east-1.amazonaws.com/production/timezones
+ *  is the POST URL. This will refer to Timezone file which is stored at URL:
+ *  https://panchangam.brahas.com/timezones/timezones.json
+ * Server Family has the utility update to update this JSON file
+ * 
+ * Created on 10th Feb 2024 - Vasu Prog Ver 1008 - for Scoreboard
+ * Modified to suit current requirement on 10th Nov 2024
+ ***************************************************************/
+static String SecurePOSTRequest(String URL, String httpData)
+{
+    HTTPClient httpclient;
+    WiFiClientSecure wificlient;
+    wificlient.setInsecure();
+
+    String payload = "";
+    //Serial.printf("Data for POST: %s Host: %s\n",httpData.c_str(),URL.substring(URL.indexOf("//")+ 2).c_str());
+    if (httpclient.begin(wificlient, URL))
+    {
+        httpclient.addHeader("Host", URL.substring(URL.indexOf("//")+ 2));
+        httpclient.addHeader("content-type", "application/json");
+        httpclient.addHeader("Content-Length", String(httpData.length()).c_str());
+        int response = httpclient.POST(httpData);
+        payload = httpclient.getString();
+        //Serial.printf("Response obtained from server: %d and payload returning: %s\n", response,payload.c_str());
+        httpclient.end();
+    }
+    else
+    {
+        Serial.println("Unable to connect using httpclient");
+    }
+    if (payload.indexOf("error")>=0)
+      return ""; 
+
+    return payload;
 }

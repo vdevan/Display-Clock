@@ -12,6 +12,7 @@
 * Stored networks - well under 512 bytes
 * 11/02/2024 - Vasu
 * ***/
+#include "Globals.h"
 
 //If valid data exists in EEPROM read it and return true. else return false
 static bool loadCredentials()
@@ -38,6 +39,7 @@ static bool loadCredentials()
   //Only version change. Make modifications to Header file if required
   //Leave the stored network as-is
   ReadNetworkData();
+
   if (header.ver != VERSION)
   {
     header.id = PROGID;
@@ -64,6 +66,7 @@ static bool loadCredentials()
   Serial.printf ("Header Values read: ID: %d, Version: %d, Calendar Index: %d Calendar Code: %s Calendar Version: %d Display: %d Clock/Weather: %d\n", header.id,header.ver,header.calIndex,header.calCode,header.calVer, header.bDisplay,header.bClock);
   logFile += ("Prog Id: ") + String(header.id) + "; Version: " + String(header.ver) + "; Display: ";
   logFile += String(bDisplay ? "Display Mode" : "Calendar Mode") + " selected\r\n";
+  logFile += String("Calendar Index: ") + String(header.calIndex) + " Version: " + String(header.calVer) + "\r\n";
   logFile += "Stored Network: " + String(storedNetworks) + "\r\n";
   Serial.printf("Stored Network: %d\n",(int)storedNetworks );
   return true;   

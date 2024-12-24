@@ -1,3 +1,5 @@
+#include "Globals.h"
+
 char TempPage[] PROGMEM = R"rawliteral(
 <!doctype html>
 <html lang="en">
@@ -263,7 +265,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       //ws.sendTXT(num,dw,strlen(dw));
       tr= "7" + ClkTZ.dateTime("H:i:s~ ")  + "Total Connected Clients: " + String(ws.connectedClients()) + "\r\n";
       ws.sendTXT(num,tr.c_str(),tr.length());
-
+      
       //Send Header Settings
       dt = "8" + String(bDisplay ? "dis" : "clk") + ";" + String(bClock ? "dcl" : "wth");
       ws.sendTXT(num,dt.c_str(),dt.length());
@@ -278,10 +280,20 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       dt = "b" + String(header.calIndex) + ";" + String(header.calCode) + ";" + String(header.calVer);
       Serial.printf("Value sent for Display Page: %s\n",dt.c_str());
       ws.sendTXT(num,dt.c_str(),dt.length());
+      
+      dt = String("7") + "Compiled Date Time: " + String(CTIME) + "\n";
+      ws.sendTXT(num,dt.c_str(),dt.length());
 
       if (bVersionChange)
       {
         dt = "cCurrent Program Ver: " + String(header.ver) + String(". A new version ") + String(pVer) + String(" is available.");
+        ws.sendTXT(num,dt.c_str(),dt.length());
+      }
+      ListDir("/",3);
+      if (LittleFS.exists("/Debug.txt"))
+      {
+        dt = "7" + GetData("/Debug.txt", -1);
+        //Serial.printf("Contents of Debug.txt: %s\n",dt.c_str());
         ws.sendTXT(num,dt.c_str(),dt.length());
       }
       break;

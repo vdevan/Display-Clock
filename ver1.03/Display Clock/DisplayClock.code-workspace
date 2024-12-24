@@ -11,6 +11,9 @@
 		],
 		"arduino.analyzeOnOpen": false,
 		"arduino.useArduinoCli": true,
-		"arduino.path": "C:\\Program Files\\Arduino CLI"
+		"arduino.path": "C:\\Program Files\\Arduino CLI",
+		"files.associations": {
+			"string": "cpp"
+		}
 	}
 }

@@ -1,3 +1,4 @@
+#include "Globals.h"
 char CaptivePage[] PROGMEM = R"rawliteral(
   <!DOCTYPE html5>
   <html lang="en">

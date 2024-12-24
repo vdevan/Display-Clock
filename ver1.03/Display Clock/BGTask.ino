@@ -1,4 +1,4 @@
-#include "Weather8x8px.h" //Change this every year before April 15
+
 
 /******************************************************************
  * This is Display board procedure. Only fixed fonts are used.
@@ -16,7 +16,7 @@
  * Ver: 1002 Vertical Centering done. Shortcuts for dynamic update completed - Dated 26/09/2024
  * Ver: 1003 Clock display on one of the lines added 7/10/24
  * *****************************************************************/
-
+#include "Globals.h"
 void DispReq(void* param)
 {
   //Variables for Display;
@@ -95,6 +95,7 @@ void DispReq(void* param)
     unsigned long scrDelay;
     String storedScrollText;
     String temp;
+    bool exitFlag = false;
   /* End of Scroll Variables */
 
   
@@ -104,6 +105,7 @@ void DispReq(void* param)
   while(true) //Will do this continuously will only actually used once unless DisplayData changes
   {
     Serial.println("Displaying Saved Texts");
+    exitFlag = false;
     start = 0;
     end = 0;
     NextX = LeftM; //Start of First Line
@@ -116,27 +118,50 @@ void DispReq(void* param)
     if (DisplayData=="")
     { 
       logFile += "display.txt file not found \r\n";
+      exitFlag = true;
     }
-    end = DisplayData.indexOf('\n');
-    if (end < 0)
+    else 
     {
-      logFile += "Display.txt configuration mismatch. Re-save the file; end Value: " + String(end) + "\r\n";
+      end = DisplayData.indexOf('\n');
+      if (end < 0)
+      {
+        logFile += "Display.txt configuration mismatch. Re-save the file; end Value: " + String(end) + "\r\n";
+        exitFlag = true;
+      }
+      else
+      {
+        lineText = DisplayData.substring(start,end);
+        lines = lineText.charAt(lineText.length()-1) - '0';
+        Serial.printf("Line Text Read: %s; Line Nos Obtained: %d\n",lineText.c_str(),lines);
+        //logFile += "First Line Text: " + lineText + " Total Lines Read: " + String(lines) + "\n";  
+        
+        start = end + 1;
+        //Get the first line and total lines so we can work on Vertical Centering
+        //int lines = DisplayData.substring(DisplayData.length()-1).toInt();  
+        if (lines <= 0 || lines > 7)
+        {
+          logFile += "display.txt configuration mismatch. Re-save the file \r\n";
+          exitFlag = true;
+        }
+      }
     }
- 
-    lineText = DisplayData.substring(start,end);
-    lines = lineText.charAt(lineText.length()-1) - '0';
-    //Serial.printf("Line Text Read: %s; Line Nos Obtained: %d\n",lineText.c_str(),lines);
-    //logFile += "First Line Text: " + lineText + " Total Lines Read: " + String(lines) + "\n";  
-     
-    start = end + 1;
-    //Get the first line and total lines so we can work on Vertical Centering
-    //int lines = DisplayData.substring(DisplayData.length()-1).toInt();  
-    if (lines <= 0 || lines > 7)
+    if (exitFlag)
     {
-      logFile += "display.txt configuration mismatch. Re-save the file \r\n";
+      dma_display->setTextSize(1);
+      dma_display->setTextWrap(true);
+      dma_display->setCursor(2, 12); //lets center it
+      dma_display->setTextColor(dma_display->color565(255,150,150));
+      dma_display->println("Invalid Display Text. Check log File. Unable to proceed"); //can be split here for showing runs in different color
+      Serial.print("Errors in Display Text found. Check log files");
+      break;
     }
     bDisplayChange = false; //We don't need to get data until data changes
-    
+    #ifndef PROD
+      Serial.print("Possible Day change called from loop. Date Time Recorded: ");
+      Serial.println(ClkTZ.dateTime());
+      Serial.print("Tamil Calendar obtained: ");
+      Serial.println(TamilCalendar.c_str());
+    #endif
     //Store the Scroll information first. Note %t must be replaced by Current Temperature
     end = DisplayData.indexOf('\n',start);
     lineText = DisplayData.substring(start,end);
@@ -476,6 +501,7 @@ void ClkReq(void* param)
   //Used for keeping track of change in date and time
   uint8_t min;
   uint8_t hr;
+  uint8_t hour;
   TIME dt;
 
   //Various colors used
@@ -541,21 +567,17 @@ void ClkReq(void* param)
   //Offset required for Vertical centering 
   int weatherOffset = 0;
   int tcOffset = 0;
+  //uint8_t tl;
 
-  if (Tline > 0) //Need Centering Let us change the co-ordinates
-  {
-    weatherOffset = (Tline * 2 )+ 1 ;
-    tcOffset = weatherOffset + (Tline * 2);
-  }
-
-
+  #ifndef PROD
+    bool printFlag = true;
+  #endif  
 
   //Set date / time for tracking
   String cd = ClkTZ.dateTime(RFC1036);
   //Serial.printf("Date Time Obtained: %s\n",cd.c_str());
   Serial.printf("UTC DATE-TIME: %s\n",ClkTZ.dateTime("Ymd"));
-  int panchlookup = strtol(ClkTZ.dateTime("Ymd").c_str(), NULL, 10);
-  Serial.printf("Panchanga Lookup should be: %d\n",panchlookup);
+
   dt.minutes = ClkTZ.minute();
   dt.hour = ClkTZ.hour();
   dt.ampm = ClkTZ.isAM();
@@ -572,6 +594,9 @@ void ClkReq(void* param)
 
   //bDayChange = !bDayChange; //Notify to fetch Panchangam 
   delay(SECOND * 2);
+
+  weatherOffset = Tline > 0 ? (Tline * 2 )+ 1 : 0 ;
+  tcOffset = weatherOffset + (Tline * 2);
 
   //To be done once. - Updates every 12 hours - Display AM / PM
   if (dt.ampm == 1)
@@ -617,14 +642,14 @@ void ClkReq(void* param)
 
   if (bClock)
   {
-      dma_display->fillRect(0, weatherY + weatherOffset,  XSize, SINGLEY, myBLACK);
-      dma_display->setCursor(weatherX, weatherY + weatherOffset);
-      dma_display->setTextSize(1);
-      dma_display->setTextColor(TZ1COLOR);
-      dma_display->print(tz1String);
-      dma_display->setTextColor(TZ2COLOR);
-      dma_display->print(tz2String);
-  }
+    dma_display->fillRect(0, weatherY + weatherOffset,  XSize, SINGLEY, myBLACK);
+    dma_display->setCursor(weatherX, weatherY + weatherOffset);
+    dma_display->setTextSize(1);
+    dma_display->setTextColor(TZ1COLOR);
+    dma_display->print(tz1String);
+    dma_display->setTextColor(TZ2COLOR);
+    dma_display->print(tz2String);
+}
   //Reset to Clock display
   dma_display->setTextWrap(false);
   dma_display->setTextSize(2);
@@ -634,6 +659,7 @@ void ClkReq(void* param)
   bUpdate = !bNetUpdate; //Force displaying weather
   bSense = !bNetSense; //Force Temperature display
   hr = dt.hour;
+  hour = 25; //dt.hour; //Force to display 12 @ hour!=dt.hour logic
   min = dt.minutes;
   hr = hr > 12 ? hr - 12 : hr;
   hr = hr == 0 ? 12 : hr;
@@ -649,28 +675,115 @@ void ClkReq(void* param)
      * Sixth line is thithiY we can leave this as is 
      *
      */
-    if (Tline > 0) //Need Centering Let us change the co-ordinates
-    {
-      weatherOffset = (Tline * 2 )+ 1 ;
-      tcOffset = weatherOffset + (Tline * 2);
-    }
 
     dt.minutes = ClkTZ.minute();
-        
-    //Print Seconds first
-    //Clear Seconds display
-    //Reset to Clock display
 
+    #ifndef PROD
+      if (dt.date != ClkTZ.day() && printFlag)
+      {
+        Serial.print("Entering date change initiated by BGTASK. DateTime: ");
+        Serial.println(ClkTZ.dateTime());
+        Serial.print("dt.date is: ");
+        Serial.println(dt.date);
+        Serial.print("Tline now is: ");
+        Serial.println(Tline);
+        printFlag = false; //Stop repetative printing
+      } 
+    #endif     
+    //Check for date. Since the task is background chances are Panchangam & Tline might not reflect correct here. May use an old one
+    //As we are calling this once a day, chances are this might be missed completely. Hence call this after 2 minutes. Date / Calendar
+    // will not change for first 3 minutes. Unavoidable. Required to ensure Panchangam & Tline are properly loaded
+    if (dt.date != ClkTZ.day() && dt.minutes > CALWAIT)
+    {
+      String cd = ClkTZ.dateTime(RFC1036);
+      dispDate = cd.substring(0, 12);
+      //If TLINE changes due to change from 2 to 3 line calendar display, then there will be some overlap. 
+      //To avoid this first clear the entire screen. 
+      dma_display->fillRect(0, dateY, PANEL_RES_X * PANEL_HCHAIN, PANEL_RES_Y * PANEL_YCHAIN, myBLACK);
+
+      weatherOffset = Tline > 0 ? (Tline * 2 )+ 1 : 0 ;
+      tcOffset = weatherOffset + (Tline * 2);
+
+      dma_display->setCursor(dateX, dateY + Tline);
+      dma_display->setTextSize(1);
+      dma_display->setTextColor(DATECOLOR);
+      dma_display->print(dispDate);
+      dt.date = ClkTZ.day();
+      #ifndef PROD
+        Serial.print("Entering date change after 2 minutes. Time:  ");
+        Serial.println(ClkTZ.dateTime());
+        Serial.print("dt.date after 2 minutes is: ");
+        Serial.println(dt.date);
+        Serial.print("Computed Tline now is: ");
+        Serial.println(Tline);
+      #endif    
+
+      //Print Panchangam now. Needed to do only once. Moved from hourly update. 
+      //Change Tamil Calendar Last character is the moon phase Needed every hour in case Time is obtained a bit late on reboot
+      int index = TamilCalendar.length() - 1;
+      TC = TamilCalendar.substring(0, index);
+      int bmpIndex = TamilCalendar.substring(index).toInt();
+
+      //dma_display->fillRect(0, tcY, XSize, SINGLEY * 3, myBLACK); //Clear the entire screen - already done in earlier line
+      dma_display->setCursor(tcX, tcY + tcOffset);
+      dma_display->setTextSize(1);
+      dma_display->setTextWrap(true);
+      dma_display->setTextColor(CALENDARCOLOR);
+      dma_display->print(TC);
+
+      //Draw Tithi bitmap - Waxing / Waning
+      if (bmpIndex == 0 || bmpIndex == 3)
+        dma_display->drawBitmap(tithiX, tithiY, bitmapArray[bmpIndex], bmpW, bmpH, myGRAY);
+      else
+        dma_display->drawBitmap(tithiX, tithiY, bitmapArray[bmpIndex], bmpW, bmpH, myWHITE);
+
+      bSense = !bNetSense; //Ensure Temperature is displayed by force
+      bUpdate = !bNetUpdate; //Force weather display
+    }
+
+    //Print Seconds first
     dma_display->setTextSize(2);
     dma_display->fillRect(secondStart, timeY, TwocharWidth, TwocharHeight , myBLACK);
     dma_display->setCursor(secondStart, timeY);
     dma_display->setTextColor(TIMECOLOR);
     dma_display->printf("%02d",ClkTZ.second());
-          
-    //We will alternate between Cloud and humidity every 5 secs
+	
+	  //Next Display Minute
+    if (min != dt.minutes)
+    {
+		  dt.hour = ClkTZ.hour();
+		  min = dt.minutes;
+		  dma_display->fillRect(minuteStart, timeY, TwocharWidth, TwocharHeight, myBLACK);
+      dma_display->setCursor(minuteStart, timeY);
+      dma_display->setTextSize(2);
+      dma_display->setTextColor(TIMECOLOR);
+      dma_display->printf("%02d",dt.minutes);
+		  dma_display->setTextSize(1);
+      if (bClock) //If dual clocks selected, then update it
+      {
+        sprintf(tz1String,"%s %02d:%02d%c ",tzID1,Ad1TZ.hour(),Ad1TZ.minute(),tz1Sign);
+        sprintf(tz2String," %s %02d:%02d%c",tzID2,Ad2TZ.hour(),Ad2TZ.minute(),tz2Sign);
+
+        dma_display->fillRect(0, weatherY + weatherOffset,  XSize, SINGLEY, myBLACK);
+        dma_display->setCursor(weatherX, weatherY + weatherOffset);
+        dma_display->setTextSize(1);
+        dma_display->setTextColor(TZ1COLOR);
+        dma_display->print(tz1String);
+        dma_display->setTextColor(TZ2COLOR);
+        dma_display->print(tz2String);
+
+        //Reset to Clock display
+        dma_display->setTextWrap(false);
+        dma_display->setTextSize(2);
+        dma_display->setCursor(timeX, timeY);
+        dma_display->setTextColor(TIMECOLOR);
+      }
+    }
+
+    //Update Cloud and humudity if weather is selected every 5 secons     
     if (!bClock)
     {
-      if (clDisp > TOGGLE)
+      if (clDisp > TOGGLE)//We will alternate between Cloud and humidity every 5 secs
       {
         clDisp = 0;
         //Clear Screen
@@ -705,45 +818,17 @@ void ClkReq(void* param)
       }
     }
     
-    //Next Minute
-    if (min != dt.minutes)
-    {
-      min = dt.minutes;
-      dma_display->fillRect(minuteStart, timeY, TwocharWidth, TwocharHeight, myBLACK);
-      dma_display->setCursor(minuteStart, timeY);
-      dma_display->setTextColor(TIMECOLOR);
-      dma_display->printf("%02d",dt.minutes);
-      dt.hour = ClkTZ.hour();
-      if (bClock)
-      {
-        sprintf(tz1String,"%s %02d:%02d%c ",tzID1,Ad1TZ.hour(),Ad1TZ.minute(),tz1Sign);
-        sprintf(tz2String," %s %02d:%02d%c",tzID2,Ad2TZ.hour(),Ad2TZ.minute(),tz2Sign);
-
-        dma_display->fillRect(0, weatherY + weatherOffset,  XSize, SINGLEY, myBLACK);
-        dma_display->setCursor(weatherX, weatherY + weatherOffset);
-        dma_display->setTextSize(1);
-        dma_display->setTextColor(TZ1COLOR);
-        dma_display->print(tz1String);
-        dma_display->setTextColor(TZ2COLOR);
-        dma_display->print(tz2String);
-
-       //Reset to Clock display
-        dma_display->setTextWrap(false);
-        dma_display->setTextSize(2);
-        dma_display->setCursor(timeX, timeY);
-        dma_display->setTextColor(TIMECOLOR);
-      }
-    }
-
     //Next Hour Also check for AM / PM and date 
-    if (hr != dt.hour)
+    if (hour != dt.hour)
     {
+      hour = dt.hour;
       hr = dt.hour;
       dma_display->fillRect(hourStart, timeY, TwocharWidth, TwocharHeight, myBLACK);
       dma_display->setCursor(hourStart, timeY);
       dma_display->setTextColor(TIMECOLOR);
       hr = hr > 12 ? hr - 12 : hr;
       hr = hr == 0 ? 12 : hr;
+      dma_display->setTextSize(2);
       dma_display->printf("%02d",hr);
       dma_display->setTextSize(1);
 
@@ -769,41 +854,6 @@ void ClkReq(void* param)
         }
       }
         
-      //Check for date needed to check every hour
-      if (dt.date != ClkTZ.day())
-      {
-        dt.date = ClkTZ.day();
-        String cd = ClkTZ.dateTime(RFC1036);
-        dispDate = cd.substring(0, 12);
-
-        //Change date and day
-        dma_display->fillRect(0, dateY + Tline, tempX, SINGLEY, myBLACK);
-        dma_display->setCursor(dateX, dateY + Tline);
-        dma_display->setTextSize(1);
-        dma_display->setTextColor(DATECOLOR);
-        dma_display->print(dispDate);
-      }
-
-      //Change Tamil Calendar Last character is the moon phase Needed every hour in case Time is obtained a bit late on reboot
-      int index = TamilCalendar.length() - 1;
-      TC = TamilCalendar.substring(0, index);
-      int bmpIndex = TamilCalendar.substring(index).toInt();
-
-
-
-      dma_display->fillRect(0, tcY + tcOffset, XSize, SINGLEY * 3, myBLACK);
-      dma_display->setCursor(tcX, tcY + tcOffset);
-      dma_display->setTextSize(1);
-      dma_display->setTextWrap(true);
-      dma_display->setTextColor(CALENDARCOLOR);
-      dma_display->print(TC);
-
-      //Draw Tithi bitmap - Waxing / Waning
-      if (bmpIndex == 0 || bmpIndex == 3)
-        dma_display->drawBitmap(tithiX, tithiY, bitmapArray[bmpIndex], bmpW, bmpH, myGRAY);
-      else
-        dma_display->drawBitmap(tithiX, tithiY, bitmapArray[bmpIndex], bmpW, bmpH, myWHITE);
-
       //Reset to Clock display
       dma_display->setTextWrap(false);
       dma_display->setTextSize(2);
@@ -811,7 +861,9 @@ void ClkReq(void* param)
       dma_display->setTextColor(TIMECOLOR);
       
     }
-    if (bSense != bNetSense) //Added in Ver 1014
+
+	  //Now for the Temperature evry 5 mins
+    if (bSense != bNetSense) 
     {
       bSense = bNetSense;
       temp = curTemp;
@@ -821,6 +873,8 @@ void ClkReq(void* param)
       dma_display->setTextColor(TEMPCOLOR);
       dma_display->print(temp);
     }
+	
+	  //Finally let us change weather - every 25 mins
     if(!bClock)
     {
       //Changes Weather and refreshes Tamil Calendar every 25 minutes set by timeDelay = 1500 seconds = 25 minutes
@@ -831,17 +885,6 @@ void ClkReq(void* param)
         //Make a copy of the variable
         wr = Weather;
         
-
-        /* This is moved to display every 10 minutes  
-        //Put the current temperature next to date
-        temp = curTemp;
-        dma_display->fillRect(tempX, tempY, SINGLEX * 7, SINGLEY, myBLACK);
-        dma_display->setCursor(tempX, tempY);
-        dma_display->setTextSize(1);
-        dma_display->setTextColor(TEMPCOLOR);
-        dma_display->print(temp);
-        *****/
-        //dma_display->fillRect(0, weatherY, PANEL_RES_X * PANEL_CHAIN, SINGLEY, myBLACK);
         dma_display->fillRect(0, weatherY + weatherOffset, cloudX, SINGLEY, myBLACK);
 
 
@@ -858,7 +901,6 @@ void ClkReq(void* param)
         dma_display->setTextColor(TIMECOLOR);
       }
     }
-
     clDisp++;
     vTaskDelay(SECOND);
   }

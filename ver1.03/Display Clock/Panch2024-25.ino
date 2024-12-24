@@ -6,6 +6,7 @@
 * the main program compiled, without any changes to the main program
 * Last updated 14-02-2024. Tamil Calendar based on Sydney time
 * ********************************************************************/
+#include "Globals.h"
 
 const char Month[][4] = {"NUL","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
 
@@ -28,6 +29,7 @@ void CheckVersionChange()
 
   if (pVer != header.ver)
     bVersionChange = true;
+
   return;
 
 }  
@@ -37,7 +39,7 @@ void CheckVersionChange()
 void CheckCalendarVersion()
 {
   String payload = GETStreamRequest(PANCHANGAMURL + String(CALENDARFILE));
-  //Serial.printf("Calendar.txt returned:\n%s",payload.c_str());
+  Serial.printf("Calendar.txt returned:\n%s",payload.c_str());
   if (payload == "")
     return;
   int length = payload.indexOf('\n');
@@ -57,40 +59,37 @@ void CheckCalendarVersion()
   if (length < 0) //No data available
     return;
 
-  retVal = retVal.substring(retVal.indexOf(',') +1);  
-  
-  //Serial.printf("Calendar line to manipulate: %s\n",retVal.c_str());
-  uint16_t calVer;
+  int codeIndex=retVal.indexOf(',');
+  int calIndex = (retVal.substring(0,codeIndex)).toInt();
+  codeIndex ++;
+  retVal = retVal.substring(codeIndex);  
+  //Serial.printf("Calendar Index Obtained: %d & line to manipulate: %s\n",calIndex, retVal.c_str());
+  int calVer;
   char calCode[6];
-  int codeIndex = retVal.indexOf(';');
+  codeIndex = retVal.indexOf(';');
   codeIndex ++;
   int verIndex = retVal.indexOf(';',codeIndex);
-  strcpy(calCode,retVal.substring(codeIndex,verIndex).c_str());
-  //Serial.printf("calCode obtained from retVal %s  Variable calCode: %s\n",retVal.substring(codeIndex,verIndex).c_str(),calCode);
+  strcpy(calCode,retVal.substring(codeIndex,verIndex).c_str());  
+  calVer = (retVal.substring(verIndex+1)).toInt();
+  //Serial.printf("calCode obtained from retVal %s  Version Obtained: %d\n",calCode,calVer);
   
-  calVer = retVal.substring(verIndex+1).toInt();
-  //Serial.printf("calVer obtained from retVal %s  Variable calVer: %d\n",retVal.substring(verIndex + 1).c_str(),calVer);
 
-  if ( calVer != header.calVer || (strcmp(calCode,header.calCode) != 0) )
+  Serial.printf("Header calCode: %s File CalCode: %s; Header calVer: %d; File calVer: %d\n",header.calCode,calCode,header.calVer,calVer);
+
+  if (calVer != header.calVer || (strcmp(calCode,header.calCode) != 0) )
   {
     Serial.println("Version change detected. Need to reboot");
+    Serial.printf("Calendar Index Obtained: %d\n",calIndex);
     //verIndex = retVal.lastIndexOf(';');
     //retVal = String("CalendarURL:") + retVal.substring(0,verIndex)+ String("/") + retVal.substring(verIndex + 1);
     strcpy(header.calCode,calCode);
     header.calVer=calVer;
+    header.calIndex = calIndex;
     
     //Remove all Calendar files. Current Year, Previous Year and Next Year. 
     RemoveCalendarFiles(ClkTZ.dateTime("Y").toInt());
-    /*Serial.printf("Year directory for deletion: %d\n",yr);
-    char buf[16];
-    sprintf(buf, "/%d", yr-1);  //Previous year if exist
-    RemoveDir(buf);
-    sprintf(buf, "/%d", yr);  //Current year if exist
-    RemoveDir(buf);
-    sprintf(buf, "/%d", yr+1);  //Next year if exist
-    RemoveDir(buf);
-    Serial.println("Successfully removed all directories. New files will be loaded on reboot");
-    ListDir("/",2);*/
+    Serial.printf("calVer to Store: %d\n",header.calVer);
+    ListDir("/",2);
     saveCredentials();
   }
 }
@@ -138,6 +137,7 @@ void ListDir(const char * dirname, uint8_t levels)
   File root = LittleFS.open(dirname);
   if(!root){
       Serial.println("- failed to open directory");
+      ws.broadcastTXT("7-failed to open directory\n");
       return;
   }
 
@@ -148,6 +148,8 @@ void ListDir(const char * dirname, uint8_t levels)
     {
       Serial.print("  DIR : ");
       Serial.println(file.name());
+      ws.broadcastTXT(String("7---Dir--- ") + file.name() + String("- \n"));
+
       if(levels)
       {
           ListDir(file.path(), levels -1);
@@ -159,17 +161,17 @@ void ListDir(const char * dirname, uint8_t levels)
       if (dirname == "/")
       {
         Serial.printf("/%s",file.name());
-        //ws.broadcastTXT(String("7/") + String(file.name()));
+        ws.broadcastTXT(String("7/") + String(file.name()));
       }
       else
       {
          Serial.printf("%s/%s",dirname,file.name());
-          //ws.broadcastTXT(String("7") + String(dirname) + String("/") + String(file.name()));
+         ws.broadcastTXT(String("7") + String(dirname) + String("/") + String(file.name()));
       }
        
       Serial.print("\tSIZE: ");
       Serial.println(file.size());
-      //ws.broadcastTXT(String("7 SIZE: ") + String(file.size()) + "\n");
+      ws.broadcastTXT(String("7 SIZE: ") + String(file.size()) + "\n");
     }
     file = root.openNextFile();
   }
@@ -327,7 +329,20 @@ bool GetDataFiles(String year,int month)
 
 String GetTC(String pIndex) 
 {
+  DayCh = ClkTZ.day(); //if the ClkTZ changes while getting calendar, this will ensure that this procedure is called again
+  #ifndef PROD
+  //Testing for missing day when calendar version changes
+  File file = LittleFS.open("/Debug.txt", FILE_APPEND);
+  file.print("TC called @");
+  file.print(ClkTZ.dateTime());
+  file.print(" String Passed: ");
+  file.println(pIndex);
+  file.flush();
+  file.close();
+  //End of Test
+#endif
   Tline = 2;
+  
   String year = pIndex.substring(0,4);
   int month = pIndex.substring(4,6).toInt();
   if (!GetDataFiles(year,month))
@@ -356,10 +371,24 @@ String GetTC(String pIndex)
     }
   }
   //Needed for Vertical Centering
-  if (data.length() > 43) //Two lines is 42. Last character is stripped out. So 43
+  if (data.length() > 41) //Two lines is 42. Last character is for bitmap. So 41
   { 
+    //data = data.substring(data.indexOf(" ") +1 );
     Tline = 0;
   }
   //Serial.printf("Calendar Data returning: %s\n",data.c_str());
+
+  #ifndef PROD
+  //Testing for missing day when calendar version changes
+  File file1 = LittleFS.open("/Debug.txt", FILE_APPEND);
+  file1.print(ClkTZ.dateTime());
+  file1.print(": Tline Computed: ");
+  file1.print(Tline);
+  file1.print(" Day changed to: ");
+  file1.println(DayCh);
+  file1.flush();
+  file1.close();
+  //End of Test
+#endif
   return data;  
 }

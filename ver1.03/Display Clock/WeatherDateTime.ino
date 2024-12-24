@@ -1,3 +1,4 @@
+#include "Globals.h"
 
 /*********************************************************************
 /* Following function will get the Gateway address, Location and time zone
@@ -73,10 +74,23 @@ static bool GetLocation()
     waitForSync();
     Serial.printf("Location: %s, TimeZone: %s obtained\n",Location.c_str(), TimeZone.c_str());
     ws.broadcastTXT(String("7TimeZone from Web: " )+ TimeZone + String("\r\n"));
-    ClkTZ.setLocation(TimeZone);
-    delay(RETRY); //Wait to get the time
+    
+    if (!SetTimeZone(&ClkTZ,TimeZone))
+        Serial.printf("Unable to set Time zone for location: %s\n",TimeZone.c_str());
+    else
+        Serial.printf("Time Now for Location: %s is %s\n",TimeZone.c_str(), ClkTZ.dateTime().c_str());
+
+    delay(SECOND); //Wait to get the time
+    #ifndef PROD
+        //Testing for missing day when calendar version changes
+        File file = LittleFS.open("/Debug.txt", FILE_APPEND);
+        file.print("Setting time after Reset: ");
+        file.println(ClkTZ.dateTime());
+        file.flush();
+        file.close();
+    #endif
     Serial.printf("Time obtained for %s now is: %s\n",Ad1TZ.getOlson().c_str(), Ad1TZ.dateTime(RFC1036).c_str());    
-    delay(RETRY); //Wait to get the time  
+    delay(SECOND); //Wait to get the time  
     Serial.printf("Time obtained for %s now is: %s\n",Ad2TZ.getOlson().c_str(), Ad2TZ.dateTime(RFC1036).c_str());    
 
     if (count < 5)
