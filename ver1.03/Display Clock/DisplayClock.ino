@@ -66,12 +66,7 @@ void setup()
   Serial.begin(115200);
   Serial.println();
   DS18B20.begin();
-  #ifndef ESP32D
-  strcpy(ESPSSID, "DISPOLD");
-  strcpy(HOSTNAME,"dclockold");
-  IPAddress ESPIP(172, 20, 32, 1); 
-  IPAddress dhcp(172, 20, 32, 5);
-  #endif
+
   PanelInit();  //Show Initial Screen
   #ifdef PROD
     Serial.println ("Working in PROD mode");

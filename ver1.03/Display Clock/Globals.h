@@ -2,10 +2,12 @@
 #define _GLOBALS_H_
 //Select Either One
 #define PROD
-#define CTIME 24122400 //Update everytime compiled and ready for upload
+#define CTIME 26122400 //Update everytime compiled and ready for upload
 #define ESP32D //The new ESP32-WROOM-32D has RGB interchanged this is with type-C connector
-
-//#define EZTIME_NETWORK_ENABLE
+#ifndef PROD
+    String testTZ = "Australia/Sydney"; //We will use this to test during day on time change over corruption default: Australia/Sydney
+#endif
+#define EZTIME_NETWORK_ENABLE
 #include <ezTime.h> //Manage Date / Time
 #include "Style.h"
 #include <WiFi.h>        //ESP8266 WiFi
@@ -187,7 +189,7 @@ uint16_t colorWheel(uint8_t pos)
 
 uint8_t Xaxis = 2;
 uint8_t Yaxis = 2;
-uint8_t Tline = 0;
+uint8_t TL = 0;
 
 //End of Display Panel Declarations
 

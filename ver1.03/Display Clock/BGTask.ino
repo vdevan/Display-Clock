@@ -77,7 +77,7 @@ void DispReq(void* param)
   uint16_t st;
   uint16_t ed;
   uint8_t cent;
-  
+  uint8_t Tline;
   /* Note: Variables declared for scrolling text. Comment if Scrolling not required*/
  
     int xdisp;
@@ -567,7 +567,7 @@ void ClkReq(void* param)
   //Offset required for Vertical centering 
   int weatherOffset = 0;
   int tcOffset = 0;
-  //uint8_t tl;
+  uint8_t Tline;
 
   #ifndef PROD
     bool printFlag = true;
@@ -595,6 +595,7 @@ void ClkReq(void* param)
   //bDayChange = !bDayChange; //Notify to fetch Panchangam 
   delay(SECOND * 2);
 
+  Tline = TL;
   weatherOffset = Tline > 0 ? (Tline * 2 )+ 1 : 0 ;
   tcOffset = weatherOffset + (Tline * 2);
 
@@ -699,6 +700,7 @@ void ClkReq(void* param)
       dispDate = cd.substring(0, 12);
       //If TLINE changes due to change from 2 to 3 line calendar display, then there will be some overlap. 
       //To avoid this first clear the entire screen. 
+      Tline = TL;
       dma_display->fillRect(0, dateY, PANEL_RES_X * PANEL_HCHAIN, PANEL_RES_Y * PANEL_YCHAIN, myBLACK);
 
       weatherOffset = Tline > 0 ? (Tline * 2 )+ 1 : 0 ;

@@ -341,7 +341,7 @@ String GetTC(String pIndex)
   file.close();
   //End of Test
 #endif
-  Tline = 2;
+  TL = 2;
   
   String year = pIndex.substring(0,4);
   int month = pIndex.substring(4,6).toInt();
@@ -374,7 +374,7 @@ String GetTC(String pIndex)
   if (data.length() > 41) //Two lines is 42. Last character is for bitmap. So 41
   { 
     //data = data.substring(data.indexOf(" ") +1 );
-    Tline = 0;
+    TL = 0;
   }
   //Serial.printf("Calendar Data returning: %s\n",data.c_str());
 
@@ -383,7 +383,7 @@ String GetTC(String pIndex)
   File file1 = LittleFS.open("/Debug.txt", FILE_APPEND);
   file1.print(ClkTZ.dateTime());
   file1.print(": Tline Computed: ");
-  file1.print(Tline);
+  file1.print(TL);
   file1.print(" Day changed to: ");
   file1.println(DayCh);
   file1.flush();

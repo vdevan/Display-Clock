@@ -72,8 +72,12 @@ static bool GetLocation()
 
     }
     waitForSync();
+    #ifndef PROD
+        TimeZone = testTZ;
+    #endif
+    logFile += "TimeZone setting is: " + TimeZone + "\n";
     Serial.printf("Location: %s, TimeZone: %s obtained\n",Location.c_str(), TimeZone.c_str());
-    ws.broadcastTXT(String("7TimeZone from Web: " )+ TimeZone + String("\r\n"));
+    //ws.broadcastTXT(String("7TimeZone from Web: " )+ TimeZone + String("\r\n"));
     
     if (!SetTimeZone(&ClkTZ,TimeZone))
         Serial.printf("Unable to set Time zone for location: %s\n",TimeZone.c_str());
